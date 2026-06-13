@@ -10,7 +10,7 @@ export const useSocket = () => {
 
   useEffect(() => {
     if (user && !socketInstance) {
-      socketInstance = io('/', {
+      socketInstance = io(import.meta.env.VITE_SOCKET_URL || '/', {
         query: { userId: user._id },
         transports: ['websocket'],
       });
