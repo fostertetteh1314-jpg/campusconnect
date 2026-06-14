@@ -10,7 +10,8 @@ export const useSocket = () => {
 
   useEffect(() => {
     if (user && !socketInstance) {
-      socketInstance = io(import.meta.env.VITE_SOCKET_URL || '/', {
+      const socketUrl = import.meta.env.PROD ? 'https://campusconnect-1a9b.onrender.com' : '/';
+      socketInstance = io(socketUrl, {
         query: { userId: user._id },
         transports: ['websocket'],
       });
