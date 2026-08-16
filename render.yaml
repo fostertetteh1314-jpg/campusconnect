@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: kobo-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: REFRESH_TOKEN_DAYS
+        value: '30'
+      - key: RATE_LIMIT_DISABLED
+        value: 'false'
+      - key: MOOLRE_ENV
+        value: production
+      - key: MOOLRE_SANDBOX_SKIP_OTP
+        value: 'false'
+      - key: PLATFORM_FEE_BPS
+        value: '500'
+      - key: OTP_PROVIDER
+        value: console
+      # Secrets (set in Render dashboard):
+      # - MONGO_URI
+      # - JWT_SECRET
+      # - AUDIT_IP_SALT
+      # - CLIENT_URL
+      # - ALLOWED_ORIGINS
+      # - CLOUDINARY_CLOUD_NAME
+      # - CLOUDINARY_API_KEY
+      # - CLOUDINARY_API_SECRET
+      # - MOOLRE_API_USER
+      # - MOOLRE_PUBLIC_KEY
+      # - MOOLRE_PRIVATE_KEY
+      # - MOOLRE_VAS_KEY
+      # - MOOLRE_ACCOUNT_NUMBER
+      # - MOOLRE_SENDER_ID
+      # - ADMIN_BOOTSTRAP_EMAIL
