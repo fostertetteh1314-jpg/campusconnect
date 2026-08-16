@@ -1,124 +1,197 @@
-import { useState, useEffect } from 'react';
+﻿import { useEffect, useState } from 'react';
+import { ImagePlus, MapPin, PackageCheck } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../api';
-import { LISTING_CATEGORIES, CONDITIONS } from '../utils/helpers';
 import BackButton from '../components/BackButton';
+import { CONDITIONS, LISTING_CATEGORIES } from '../utils/helpers';
+
+const methodOptions = [
+  { value: 'campus_pickup', label: 'Campus pickup', hint: 'Meet at a familiar campus spot' },
+  { value: 'public_meetup', label: 'Public meetup', hint: 'Agree on a safe public location' },
+  { value: 'delivery', label: 'Delivery', hint: 'Arrange delivery directly with the buyer' },
+];
+
+const initialForm = {
+  title: '', description: '', price: '', category: '', condition: '', contactNumber: '',
+  quantity: 1, campus: 'University of Cape Coast', location: '',
+  fulfilmentMethods: ['campus_pickup', 'public_meetup'],
+};
 
 export default function CreateListing() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEdit = !!id;
-  const [form, setForm] = useState({ title: '', description: '', price: '', category: '', condition: '', contactNumber: '' });
+  const isEdit = Boolean(id);
+  const [form, setForm] = useState(initialForm);
   const [images, setImages] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isEdit) {
-      api.get(`/listings/${id}`).then((r) => {
-        const l = r.data;
-        setForm({ title: l.title, description: l.description, price: l.price, category: l.category, condition: l.condition, contactNumber: l.contactNumber });
-        setPreviews(l.images || []);
-      });
-    }
+    if (!isEdit) return;
+    api.get(`/listings/${id}`).then(({ data }) => {
+      setForm({ ...initialForm, ...data, fulfilmentMethods: data.fulfilmentMethods || initialForm.fulfilmentMethods });
+      setPreviews(data.images || []);
+    }).catch(() => setError('We could not load this listing. Try again.'));
   }, [id, isEdit]);
 
-  const handleImages = (e) => {
-    const files = Array.from(e.target.files);
-    setImages(files);
-    setPreviews(files.map((f) => URL.createObjectURL(f)));
+  useEffect(() => () => previews.forEach((src) => {
+    if (src.startsWith('blob:')) URL.revokeObjectURL(src);
+  }), [previews]);
+
+  const field = (name) => ({
+    value: form[name],
+    onChange: (event) => setForm((current) => ({ ...current, [name]: event.target.value })),
+  });
+
+  const toggleMethod = (value) => {
+    setForm((current) => ({
+      ...current,
+      fulfilmentMethods: current.fulfilmentMethods.includes(value)
+        ? current.fulfilmentMethods.filter((method) => method !== value)
+        : [...current.fulfilmentMethods, value],
+    }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleImages = (event) => {
+    const files = Array.from(event.target.files).slice(0, 5);
+    setImages(files);
+    setPreviews(files.map((file) => URL.createObjectURL(file)));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!form.fulfilmentMethods.length) {
+      setError('Choose at least one handover option.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
       const data = new FormData();
-      Object.entries(form).forEach(([k, v]) => data.append(k, v));
-      images.forEach((img) => data.append('images', img));
-      if (isEdit) {
-        await api.put(`/listings/${id}`, data);
-      } else {
-        await api.post('/listings', data);
-      }
+      Object.entries(form).forEach(([key, value]) => {
+        data.append(key, key === 'fulfilmentMethods' ? JSON.stringify(value) : value);
+      });
+      images.forEach((image) => data.append('images', image));
+      if (isEdit) await api.put(`/listings/${id}`, data);
+      else await api.post('/listings', data);
       navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save listing');
-    } finally { setLoading(false); }
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'We could not save your listing. Try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const f = (field) => ({ value: form[field], onChange: (e) => setForm({ ...form, [field]: e.target.value }) });
-
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
-      <BackButton label="Back to Dashboard" to="/dashboard" />
-      <h1 className="section-title mb-6">{isEdit ? 'Edit Listing' : '📦 Post a Listing'}</h1>
+    <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+      <BackButton label="Back to dashboard" to="/dashboard" />
+      <div className="mb-7 flex items-end justify-between gap-4">
+        <div>
+          <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.2em] text-cobalt">Sell on campus</p>
+          <h1 className="section-title text-4xl sm:text-5xl">{isEdit ? 'Tune up your listing' : 'Post it. Move it.'}</h1>
+        </div>
+        <PackageCheck aria-hidden="true" className="hidden h-11 w-11 text-mango sm:block" strokeWidth={2.25} />
+      </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl mb-5">{error}</div>
-      )}
+      {error && <div role="alert" className="mb-5 rounded-[14px] bg-coral/10 px-4 py-3 text-sm font-semibold text-coral">{error}</div>}
 
-      <form onSubmit={handleSubmit} className="card p-6 space-y-5 shadow-sm">
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Title *</label>
-          <input required className="input-field" placeholder="e.g. Data Structures Textbook" {...f('title')} />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description *</label>
-          <textarea required rows={4} className="input-field resize-none" placeholder="Describe your item in detail..." {...f('description')} />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="card space-y-7 p-5 sm:p-8">
+        <fieldset className="space-y-5">
+          <legend className="font-display text-2xl font-extrabold uppercase">What are you selling?</legend>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Price (GHS) *</label>
-            <input required type="number" min="0" className="input-field" placeholder="0.00" {...f('price')} />
+            <label htmlFor="listing-title" className="mb-1.5 block text-sm font-bold">Item title</label>
+            <input id="listing-title" required className="input-field" placeholder="Data Structures textbook" {...field('title')} />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Contact Number *</label>
-            <input required className="input-field" placeholder="0xx xxx xxxx" {...f('contactNumber')} />
+            <label htmlFor="listing-description" className="mb-1.5 block text-sm font-bold">Description</label>
+            <textarea id="listing-description" required rows={5} className="input-field resize-y" placeholder="Condition, edition, what is includedâ€¦" {...field('description')} />
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="listing-category" className="mb-1.5 block text-sm font-bold">Category</label>
+              <select id="listing-category" required className="input-field" {...field('category')}>
+                <option value="">Choose a category</option>
+                {LISTING_CATEGORIES.map((category) => <option key={category}>{category}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="listing-condition" className="mb-1.5 block text-sm font-bold">Condition</label>
+              <select id="listing-condition" required className="input-field" {...field('condition')}>
+                <option value="">Choose condition</option>
+                {CONDITIONS.map((condition) => <option key={condition}>{condition}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <label htmlFor="listing-price" className="mb-1.5 block text-sm font-bold">Price (GHâ‚µ)</label>
+              <input id="listing-price" required type="number" min="0.01" step="0.01" inputMode="decimal" className="input-field" placeholder="0.00" {...field('price')} />
+            </div>
+            <div>
+              <label htmlFor="listing-quantity" className="mb-1.5 block text-sm font-bold">Quantity</label>
+              <input id="listing-quantity" required type="number" min="1" max="100" inputMode="numeric" className="input-field" {...field('quantity')} />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-5 border-t border-ink/10 pt-7">
+          <legend className="font-display text-2xl font-extrabold uppercase">Where should buyers meet you?</legend>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="listing-campus" className="mb-1.5 block text-sm font-bold">Campus</label>
+              <input id="listing-campus" required className="input-field" {...field('campus')} />
+            </div>
+            <div>
+              <label htmlFor="listing-location" className="mb-1.5 block text-sm font-bold">Preferred spot</label>
+              <div className="relative">
+                <MapPin aria-hidden="true" className="absolute left-3.5 top-3.5 h-4 w-4 text-muted" />
+                <input id="listing-location" className="input-field pl-10" placeholder="Science market, old siteâ€¦" {...field('location')} />
+              </div>
+            </div>
+          </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Category *</label>
-            <select required className="input-field" {...f('category')}>
-              <option value="">Select category</option>
-              {LISTING_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <label htmlFor="listing-phone" className="mb-1.5 block text-sm font-bold">Contact number</label>
+            <input id="listing-phone" required type="tel" className="input-field" placeholder="024 000 0000" {...field('contactNumber')} />
+            <p className="mt-2 text-xs text-muted">Buyers still pay through KOBO. This number helps coordinate handover.</p>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Condition *</label>
-            <select required className="input-field" {...f('condition')}>
-              <option value="">Select condition</option>
-              {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <p className="mb-2 text-sm font-bold">Handover options</p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {methodOptions.map((option) => {
+                const checked = form.fulfilmentMethods.includes(option.value);
+                return (
+                  <label key={option.value} className={`cursor-pointer rounded-[14px] p-4 shadow-[inset_0_0_0_1px_rgba(30,33,28,.14)] transition ${checked ? 'bg-lime shadow-[inset_0_0_0_2px_#1E211C]' : 'bg-paper hover:bg-white'}`}>
+                    <input type="checkbox" className="sr-only" checked={checked} onChange={() => toggleMethod(option.value)} />
+                    <span className="block text-sm font-extrabold">{option.label}</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-ink/65">{option.hint}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Images <span className="text-slate-400 font-normal">(up to 5)</span></label>
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-6 cursor-pointer transition-colors bg-slate-50 hover:bg-blue-50">
-            <svg className="w-8 h-8 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <span className="text-sm text-slate-500">Click to upload images</span>
-            <input type="file" multiple accept="image/*" onChange={handleImages} className="hidden" />
+        </fieldset>
+
+        <fieldset className="border-t border-ink/10 pt-7">
+          <legend className="font-display text-2xl font-extrabold uppercase">Show the real thing</legend>
+          <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[14px] border-2 border-dashed border-ink/20 bg-paper p-6 text-center transition hover:border-cobalt hover:bg-cobalt/5">
+            <ImagePlus aria-hidden="true" className="mb-2 h-8 w-8 text-cobalt" />
+            <span className="text-sm font-extrabold">Add up to five clear photos</span>
+            <span className="mt-1 text-xs text-muted">JPG, PNG or WebP</span>
+            <input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleImages} className="sr-only" />
           </label>
           {previews.length > 0 && (
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {previews.map((src, i) => (
-                <img key={i} src={src} alt="" className="w-20 h-20 object-cover rounded-xl border-2 border-slate-200" />
-              ))}
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {previews.map((src, index) => <img key={src} src={src} alt={`Listing preview ${index + 1}`} className="aspect-square w-full rounded-[12px] object-cover" />)}
             </div>
           )}
-        </div>
-        <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={loading} className="btn-primary flex-1 py-3">
-            {loading ? 'Saving...' : isEdit ? 'Update Listing' : 'Post Listing 🚀'}
-          </button>
-          <button type="button" onClick={() => navigate(-1)} className="btn-secondary px-6">Cancel</button>
+        </fieldset>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-ink/10 pt-7 sm:flex-row sm:justify-end">
+          <button type="button" onClick={() => navigate(-1)} className="btn-secondary">Cancel</button>
+          <button type="submit" disabled={loading} className="btn-primary sm:min-w-44">{loading ? 'Savingâ€¦' : isEdit ? 'Update listing' : 'Post listing'}</button>
         </div>
       </form>
-    </div>
+    </main>
   );
 }

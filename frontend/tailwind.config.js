@@ -4,10 +4,19 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Manrope', 'system-ui', 'sans-serif'],
+        display: ['Barlow Condensed', 'Arial Narrow', 'sans-serif'],
       },
       colors: {
-        brand: { DEFAULT: '#2563eb', dark: '#1d4ed8' },
+        ink: '#1E211C',
+        paper: '#F5F1E8',
+        'paper-bright': '#FFFDF7',
+        lime: '#C8F135',
+        cobalt: '#275DCE',
+        mango: '#FFB000',
+        coral: '#E95D4F',
+        muted: '#5B6057',
+        brand: { DEFAULT: '#275DCE', dark: '#1E47A8' },
       },
       animation: {
         'in': 'fadeIn 0.15s ease-out',
@@ -19,8 +28,8 @@ export default {
         slideInFromTop: { from: { transform: 'translateY(-8px)', opacity: 0 }, to: { transform: 'translateY(0)', opacity: 1 } },
       },
       boxShadow: {
-        'card': '0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)',
-        'card-hover': '0 4px 12px 0 rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04)',
+        'card': '0 8px 20px -14px rgb(30 33 28 / 0.42)',
+        'card-hover': '0 16px 34px -20px rgb(30 33 28 / 0.55)',
       },
     },
   },

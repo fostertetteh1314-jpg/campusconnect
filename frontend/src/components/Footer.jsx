@@ -1,50 +1,17 @@
 import { Link } from 'react-router-dom';
 
 export default function Footer() {
+  const linkClass = 'hover:text-lime';
   return (
-    <footer className="bg-gray-950 text-gray-400">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
-          <div className="col-span-2 md:col-span-1">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
-                <span className="text-white font-black text-sm">CC</span>
-              </div>
-              <span className="text-white font-bold text-lg">Campus<span className="text-blue-400">Connect</span></span>
-            </div>
-            <p className="text-sm leading-relaxed text-gray-500">
-              The marketplace built exclusively for UCC students. Buy, sell, and offer services on campus.
-            </p>
-          </div>
-          <div>
-            <h4 className="text-white font-semibold mb-4 text-sm">Marketplace</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><Link to="/marketplace" className="hover:text-white transition-colors">Browse Items</Link></li>
-              <li><Link to="/listings/new" className="hover:text-white transition-colors">Sell an Item</Link></li>
-              <li><Link to="/services" className="hover:text-white transition-colors">Student Services</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="text-white font-semibold mb-4 text-sm">Account</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><Link to="/register" className="hover:text-white transition-colors">Join Free</Link></li>
-              <li><Link to="/login" className="hover:text-white transition-colors">Sign In</Link></li>
-              <li><Link to="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></li>
-              <li><Link to="/favorites" className="hover:text-white transition-colors">Saved Items</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="text-white font-semibold mb-4 text-sm">Info</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><span className="text-xs bg-blue-900/50 text-blue-400 px-2 py-1 rounded-full">UCC Students Only</span></li>
-              <li><span className="text-gray-600 text-xs">Version 1.0 MVP</span></li>
-            </ul>
-          </div>
+    <footer className="hidden bg-ink text-paper md:block">
+      <div className="mx-auto max-w-7xl px-8 py-14">
+        <div className="grid gap-10 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+          <div><Link to="/" className="display-type text-4xl">KOBO</Link><p className="mt-4 max-w-xs text-sm leading-6 text-paper/75">Find products and services nearby, talk in-app, and keep the next step clear.</p></div>
+          <div><h2 className="text-sm font-extrabold">Browse</h2><ul className="mt-4 space-y-3 text-sm text-paper/75"><li><Link to="/marketplace" className={linkClass}>Marketplace</Link></li><li><Link to="/services" className={linkClass}>Services</Link></li><li><Link to="/favorites" className={linkClass}>Saved items</Link></li></ul></div>
+          <div><h2 className="text-sm font-extrabold">Sell</h2><ul className="mt-4 space-y-3 text-sm text-paper/75"><li><Link to="/listings/new" className={linkClass}>Post a listing</Link></li><li><Link to="/services/new" className={linkClass}>Offer a service</Link></li><li><Link to="/dashboard" className={linkClass}>Dashboard</Link></li></ul></div>
+          <div><h2 className="text-sm font-extrabold">Pilot</h2><p className="mt-4 text-sm leading-6 text-paper/75">Launching at UCC, Cape Coast.</p><p className="mt-3 inline-flex rounded-full bg-lime px-3 py-1 text-xs font-extrabold text-ink">Find am. Pay safe.</p></div>
         </div>
-        <div className="border-t border-gray-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-sm text-gray-600">&copy; {new Date().getFullYear()} CampusConnect. Built for UCC students.</p>
-          <p className="text-xs text-gray-700">Made with ❤️ for campus life</p>
-        </div>
+        <div className="mt-12 flex items-center justify-between border-t border-paper/15 pt-6 text-xs text-paper/70"><p>© {new Date().getFullYear()} KOBO</p><p>Built for local campus trade.</p></div>
       </div>
     </footer>
   );

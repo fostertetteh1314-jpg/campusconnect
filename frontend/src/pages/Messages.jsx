@@ -1,119 +1,46 @@
-import { useState, useEffect } from 'react';
+﻿import { useEffect, useState } from 'react';
+import { ArrowLeft, MessageCircle } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api';
 import ChatBox from '../components/ChatBox';
 import { useAuth } from '../context/AuthContext';
-import { getInitials, formatRelativeTime } from '../utils/helpers';
+import { formatRelativeTime, getInitials } from '../utils/helpers';
 
 export default function Messages() {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
+  const conversationId = searchParams.get('conversation');
 
-  const toId = searchParams.get('to');
-  const toName = searchParams.get('name');
+  const otherParticipant = (conversation) => conversation.participants?.find((participant) => String(participant._id || participant) !== String(user?._id));
+  const select = (conversation) => { setSelected(conversation); setSearchParams({ conversation: conversation._id }); };
 
   useEffect(() => {
-    api.get('/messages/conversations')
-      .then((r) => setConversations(r.data))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    const bootstrap = async () => {
+      try {
+        let list = (await api.get('/v1/conversations')).data.conversations || [];
+        const toId = searchParams.get('to');
+        if (toId) {
+          const created = (await api.post('/v1/conversations', { participantId: toId, contextType: searchParams.get('contextType') || 'general', contextId: searchParams.get('contextId') || undefined })).data;
+          if (!list.some((conversation) => conversation._id === created._id)) list = [created, ...list];
+          if (!cancelled) { setConversations(list); select(created); }
+        } else if (!cancelled) {
+          setConversations(list);
+          const requested = list.find((conversation) => conversation._id === conversationId);
+          if (requested) setSelected(requested);
+        }
+      } finally { if (!cancelled) setLoading(false); }
+    };
+    bootstrap();
+    return () => { cancelled = true; };
+  // URL bootstrap should run once; selection updates locally.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (toId && toName) {
-      setSelectedUser({ _id: toId, name: decodeURIComponent(toName), profileImage: null });
-    }
-  }, [toId, toName]);
-
-  const getOther = (msg) => {
-    if (!msg) return null;
-    const sender = msg.senderId;
-    const receiver = msg.receiverId;
-    if ((sender?._id || sender) === user?._id) return receiver;
-    return sender;
-  };
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Messages</h1>
-
-      <div className="card overflow-hidden" style={{ height: 'calc(100vh - 200px)', minHeight: '500px' }}>
-        <div className="flex h-full">
-          {/* Sidebar */}
-          <div className={`w-full md:w-72 border-r border-gray-200 flex flex-col ${selectedUser ? 'hidden md:flex' : 'flex'}`}>
-            <div className="p-3 border-b border-gray-100">
-              <p className="text-sm font-semibold text-gray-600">Conversations</p>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="p-4 space-y-3">
-                  {[...Array(4)].map((_, i) => <div key={i} className="flex gap-3 animate-pulse"><div className="w-10 h-10 bg-gray-200 rounded-full shrink-0" /><div className="flex-1 space-y-2"><div className="h-3 bg-gray-200 rounded w-3/4" /><div className="h-3 bg-gray-200 rounded w-1/2" /></div></div>)}
-                </div>
-              ) : conversations.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8 px-4">No conversations yet</p>
-              ) : (
-                conversations.map((msg) => {
-                  const other = getOther(msg);
-                  if (!other) return null;
-                  const otherId = other?._id || other;
-                  const isSelected = selectedUser?._id === otherId;
-                  return (
-                    <button
-                      key={msg._id}
-                      onClick={() => setSelectedUser(other)}
-                      className={`w-full text-left px-3 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
-                    >
-                      {other?.profileImage ? (
-                        <img src={other.profileImage} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                          {getInitials(other?.name || '?')}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{other?.name || 'User'}</p>
-                        <p className="text-xs text-gray-400 truncate">{msg.message}</p>
-                      </div>
-                      <span className="text-xs text-gray-400 shrink-0">{formatRelativeTime(msg.createdAt)}</span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Chat area */}
-          <div className={`flex-1 flex flex-col ${!selectedUser ? 'hidden md:flex' : 'flex'}`}>
-            {selectedUser ? (
-              <>
-                <div className="md:hidden px-4 py-3 border-b border-gray-200">
-                  <button onClick={() => setSelectedUser(null)} className="text-sm text-blue-600 flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Back
-                  </button>
-                </div>
-                <ChatBox
-                  key={selectedUser._id}
-                  recipientId={selectedUser._id || selectedUser}
-                  recipientName={selectedUser.name || 'User'}
-                  recipientImage={selectedUser.profileImage}
-                />
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-400">
-                <div className="text-center">
-                  <p className="text-4xl mb-3">💬</p>
-                  <p>Select a conversation</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <div className="mx-auto max-w-7xl px-0 py-0 md:px-8 md:py-10"><div className="overflow-hidden bg-paper-bright shadow-card md:rounded-[14px]" style={{ height: 'calc(100vh - 72px)', minHeight: 560 }}><div className="flex h-full"><aside className={`${selected ? 'hidden md:flex' : 'flex'} w-full flex-col border-r border-ink/10 md:w-80`}><div className="p-5"><h1 className="display-type text-4xl">Messages</h1><p className="mt-1 text-xs text-muted">Conversations and offers in one place.</p></div><div className="flex-1 overflow-y-auto">{loading ? <div className="space-y-3 p-4">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-16 animate-pulse rounded-[12px] bg-ink/10" />)}</div> : conversations.length === 0 ? <div className="px-6 py-12 text-center"><MessageCircle className="mx-auto h-8 w-8 text-ink/30" /><p className="mt-4 text-sm font-bold">No conversations yet</p><p className="mt-2 text-xs leading-5 text-muted">Open an item or service and choose Message to start.</p></div> : conversations.map((conversation) => { const other = otherParticipant(conversation); return <button key={conversation._id} onClick={() => select(conversation)} className={`flex min-h-20 w-full items-center gap-3 px-4 text-left transition hover:bg-ink/5 ${selected?._id === conversation._id ? 'bg-lime/25' : ''}`}><span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ink text-xs font-extrabold text-paper">{other?.profileImage ? <img src={other.profileImage} alt="" className="h-full w-full object-cover" /> : getInitials(other?.name || '?')}</span><span className="min-w-0 flex-1"><strong className="block truncate text-sm">{other?.name || 'KOBO user'}</strong><span className="mt-1 block text-xs capitalize text-muted">{conversation.contextType === 'general' ? 'Direct message' : `About a ${conversation.contextType}`}</span></span><span className="text-[10px] text-ink/35">{formatRelativeTime(conversation.lastMessageAt)}</span></button>; })}</div></aside><main className={`${selected ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col`}>{selected ? <><div className="border-b border-ink/10 p-2 md:hidden"><button onClick={() => { setSelected(null); setSearchParams({}); }} className="btn-ghost"><ArrowLeft className="h-4 w-4" />Back</button></div><ChatBox key={selected._id} conversation={selected} /></> : <div className="flex flex-1 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-10 w-10 text-ink/25" /><p className="mt-4 text-sm font-bold text-muted">Choose a conversation</p></div></div>}</main></div></div></div>
   );
 }

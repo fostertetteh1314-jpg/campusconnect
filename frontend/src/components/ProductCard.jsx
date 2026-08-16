@@ -1,93 +1,54 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
+import { Heart, Image as ImageIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatPrice, formatRelativeTime } from '../utils/helpers';
+import { formatPrice, formatRelativeTime, getInitials } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
 
 const conditionColors = {
-  'New': 'bg-emerald-100 text-emerald-700',
-  'Like New': 'bg-blue-100 text-blue-700',
-  'Good': 'bg-amber-100 text-amber-700',
-  'Fair': 'bg-orange-100 text-orange-700',
-  'Poor': 'bg-red-100 text-red-700',
+  New: 'bg-lime text-ink',
+  'Like New': 'bg-cobalt text-white',
+  Good: 'bg-mango text-ink',
+  Fair: 'bg-[#F5D7A6] text-ink',
+  Poor: 'bg-coral text-white',
 };
 
 export default function ProductCard({ listing, onFavoriteChange }) {
   const { user } = useAuth();
-  const [favorited, setFavorited] = useState(listing.favorited || false);
+  const [favorited, setFavorited] = useState(Boolean(listing.favorited));
   const [toggling, setToggling] = useState(false);
 
-  const handleFavorite = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!user) return;
+  const handleFavorite = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!user || toggling) return;
     setToggling(true);
     try {
-      const res = await api.post('/favorites', { listingId: listing._id });
-      setFavorited(res.data.favorited);
+      const response = await api.post('/favorites', { listingId: listing._id });
+      setFavorited(response.data.favorited);
       onFavoriteChange?.();
-    } finally {
-      setToggling(false);
-    }
+    } finally { setToggling(false); }
   };
 
   return (
-    <Link to={`/listings/${listing._id}`} className="card-hover group flex flex-col">
-      {/* Image */}
-      <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
+    <Link to={`/listings/${listing._id}`} className="card-hover group flex min-w-0 flex-col">
+      <div className="relative aspect-[4/3] overflow-hidden bg-ink/5">
         {listing.images?.[0] ? (
-          <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <img src={listing.images[0]} alt={listing.title} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-2">
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="text-xs">No image</span>
-          </div>
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-ink/30"><ImageIcon className="h-8 w-8" strokeWidth={1.6} /><span className="text-xs font-semibold">No image</span></div>
         )}
-
-        {/* Overlay actions */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-        {user && (
-          <button onClick={handleFavorite} disabled={toggling}
-            className={`absolute top-2.5 right-2.5 p-2 rounded-xl backdrop-blur-sm transition-all duration-200 ${favorited ? 'bg-red-500 text-white shadow-lg' : 'bg-white/90 text-slate-400 hover:text-red-500 shadow'}`}>
-            <svg className="w-4 h-4" fill={favorited ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
-          </button>
-        )}
-
-        <span className={`absolute top-2.5 left-2.5 badge ${conditionColors[listing.condition] || 'bg-slate-100 text-slate-600'}`}>
-          {listing.condition}
-        </span>
+        {listing.condition && <span className={`badge absolute left-2.5 top-2.5 ${conditionColors[listing.condition] || 'bg-paper-bright text-ink'}`}>{listing.condition}</span>}
+        {user && <button type="button" onClick={handleFavorite} disabled={toggling} aria-label={favorited ? `Remove ${listing.title} from saved items` : `Save ${listing.title}`} className={`absolute right-2.5 top-2.5 flex h-11 w-11 items-center justify-center rounded-full shadow-card transition ${favorited ? 'bg-coral text-white' : 'bg-paper-bright text-muted hover:text-coral'}`}><Heart className="h-5 w-5" fill={favorited ? 'currentColor' : 'none'} /></button>}
       </div>
-
-      {/* Content */}
-      <div className="p-3.5 flex flex-col flex-1 gap-2">
-        <div>
-          <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 leading-snug">{listing.title}</h3>
-          <div className="flex items-center justify-between mt-1.5">
-            <p className="text-blue-600 font-bold text-base">{formatPrice(listing.price)}</p>
-            <span className="text-xs text-slate-400">{formatRelativeTime(listing.createdAt)}</span>
-          </div>
+      <div className="flex flex-1 flex-col p-3.5 sm:p-4">
+        <h3 className="line-clamp-2 text-sm font-extrabold leading-snug text-ink sm:text-base">{listing.title}</h3>
+        <p className="mt-2 text-base font-extrabold text-cobalt sm:text-lg">{formatPrice(listing.price)}</p>
+        <div className="mt-4 flex items-center justify-between gap-2 border-t border-ink/10 pt-3 text-[11px] text-muted">
+          <span className="truncate font-semibold">{listing.category}</span>
+          <span className="shrink-0">{formatRelativeTime(listing.createdAt)}</span>
         </div>
-
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-auto">
-          <span className="badge bg-slate-100 text-slate-600 text-[10px]">{listing.category}</span>
-          {listing.sellerId && (
-            <div className="flex items-center gap-1.5">
-              {listing.sellerId.profileImage ? (
-                <img src={listing.sellerId.profileImage} alt="" className="w-5 h-5 rounded-full object-cover" />
-              ) : (
-                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[9px] font-bold">
-                  {listing.sellerId.name?.[0]}
-                </div>
-              )}
-              <span className="text-xs text-slate-500 max-w-[70px] truncate">{listing.sellerId.name?.split(' ')[0]}</span>
-            </div>
-          )}
-        </div>
+        {listing.sellerId && <div className="mt-3 flex items-center gap-2"><span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ink text-[9px] font-extrabold text-paper">{listing.sellerId.profileImage ? <img src={listing.sellerId.profileImage} alt="" className="h-full w-full object-cover" /> : getInitials(listing.sellerId.name)}</span><span className="truncate text-xs font-semibold text-muted">{listing.sellerId.name}</span></div>}
       </div>
     </Link>
   );

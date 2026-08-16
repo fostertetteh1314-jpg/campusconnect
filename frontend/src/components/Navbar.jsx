@@ -1,166 +1,72 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { ChevronDown, Heart, LayoutDashboard, LogOut, MapPin, MessageCircle, Plus, ShieldCheck, UserRound } from 'lucide-react';
+import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { disconnectSocket } from '../hooks/useSocket';
-import api from '../api';
 import { getInitials } from '../utils/helpers';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const [unread, setUnread] = useState(0);
-  const [scrolled, setScrolled] = useState(false);
   const dropRef = useRef(null);
+  const dropButtonRef = useRef(null);
 
+  useEffect(() => { if (user) api.get('/messages/unread').then((response) => setUnread(response.data.count)).catch(() => {}); }, [user]);
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
+    const close = (event) => { if (dropRef.current && !dropRef.current.contains(event.target)) setDropOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
   }, []);
-
   useEffect(() => {
-    if (user) api.get('/messages/unread').then((r) => setUnread(r.data.count)).catch(() => {});
-  }, [user]);
+    if (!dropOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') { setDropOpen(false); dropButtonRef.current?.focus(); }
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [dropOpen]);
 
-  useEffect(() => {
-    const handler = (e) => { if (dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const handleLogout = () => { disconnectSocket(); logout(); navigate('/'); setDropOpen(false); };
-
-  const activeClass = 'text-blue-600 font-semibold';
-  const inactiveClass = 'text-gray-500 hover:text-gray-900 font-medium';
-  const navLinkClass = ({ isActive }) => `text-sm transition-colors duration-200 ${isActive ? activeClass : inactiveClass}`;
+  const handleLogout = () => { disconnectSocket(); logout(); setDropOpen(false); navigate('/'); };
+  const navClass = ({ isActive }) => `inline-flex min-h-11 items-center border-b-2 px-1 text-sm font-bold transition-colors ${isActive ? 'border-lime text-paper' : 'border-transparent text-paper/75 hover:text-paper'}`;
+  const menuItems = [
+    { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+    { label: 'Profile', to: '/profile', icon: UserRound },
+    { label: 'Saved', to: '/favorites', icon: Heart },
+    { label: 'Messages', to: '/messages', icon: MessageCircle },
+  ];
 
   return (
-    <nav className={`bg-white/90 backdrop-blur-md sticky top-0 z-50 transition-shadow duration-300 ${scrolled ? 'shadow-md border-b border-slate-100' : 'border-b border-slate-100'}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="sticky top-0 z-50 h-16 bg-ink text-paper md:h-[72px]">
+      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 md:px-8">
+        <Link to="/" className="display-type text-[2.15rem] leading-none" aria-label="KOBO home">KOBO</Link>
+        <Link to="/marketplace" className="flex min-h-11 min-w-0 items-center gap-2 rounded-[12px] px-2 text-sm font-bold text-paper/80 hover:bg-white/5 hover:text-paper md:hidden"><MapPin className="h-4 w-4 shrink-0 text-lime" aria-hidden="true" /><span className="truncate">UCC · Cape Coast</span></Link>
 
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <span className="text-white font-black text-sm">CC</span>
+        <nav className="hidden h-full items-center gap-7 md:flex" aria-label="Main navigation">
+          <NavLink to="/marketplace" className={navClass}>Marketplace</NavLink><NavLink to="/services" className={navClass}>Services</NavLink>
+          {user && <NavLink to="/messages" className={navClass}>Messages{unread > 0 && <span className="ml-2 rounded-full bg-coral px-2 py-0.5 text-[10px] text-white">{unread > 99 ? '99+' : unread}</span>}</NavLink>}
+        </nav>
+
+        <div className="flex items-center gap-2">
+          {user ? <>
+            <Link to="/listings/new" className="hidden min-h-11 items-center gap-2 rounded-[14px] bg-lime px-4 text-sm font-extrabold text-ink transition hover:bg-[#d7fa59] md:inline-flex"><Plus className="h-4 w-4" />Sell</Link>
+            <div className="relative" ref={dropRef}>
+              <button ref={dropButtonRef} type="button" onClick={() => setDropOpen((value) => !value)} aria-expanded={dropOpen} aria-controls="account-disclosure" className="flex min-h-11 items-center gap-2 rounded-[12px] p-1.5 transition hover:bg-white/10">
+                {user.profileImage ? <img src={user.profileImage} alt="" className="h-8 w-8 rounded-[10px] object-cover" /> : <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-cobalt text-xs font-extrabold text-white">{getInitials(user.name)}</span>}
+                <span className="hidden max-w-28 truncate text-sm font-bold sm:block">{user.name.split(' ')[0]}</span><ChevronDown className={`hidden h-4 w-4 text-paper/70 transition sm:block ${dropOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {dropOpen && <div id="account-disclosure" className="absolute right-0 mt-2 w-60 rounded-[14px] bg-paper-bright p-2 text-ink shadow-[0_20px_55px_-24px_rgba(0,0,0,.7)]">
+                <div className="px-3 py-2"><p className="truncate text-sm font-extrabold">{user.name}</p><p className="truncate text-xs text-muted">{user.email}</p></div><div className="my-1 h-px bg-ink/10" />
+                {menuItems.map(({ label, to, icon: Icon }) => <Link key={to} to={to} onClick={() => setDropOpen(false)} className="flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-sm font-semibold hover:bg-ink/5"><Icon className="h-4 w-4 text-muted" />{label}</Link>)}
+                {user.role === 'admin' && <Link to="/admin" onClick={() => setDropOpen(false)} className="flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-sm font-bold text-cobalt hover:bg-cobalt/5"><ShieldCheck className="h-4 w-4" />Admin</Link>}
+                <div className="my-1 h-px bg-ink/10" /><button onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-[10px] px-3 text-sm font-bold text-coral hover:bg-coral/5"><LogOut className="h-4 w-4" />Sign out</button>
+              </div>}
             </div>
-            <span className="font-bold text-gray-900 text-lg hidden sm:block tracking-tight">
-              Campus<span className="text-blue-600">Connect</span>
-            </span>
-          </Link>
-
-          {/* Desktop nav links */}
-          <div className="hidden md:flex items-center gap-7">
-            <NavLink to="/marketplace" className={navLinkClass}>Marketplace</NavLink>
-            <NavLink to="/services" className={navLinkClass}>Services</NavLink>
-            {user && (
-              <NavLink to="/messages" className={({ isActive }) => `relative text-sm transition-colors duration-200 ${isActive ? activeClass : inactiveClass}`}>
-                Messages
-                {unread > 0 && (
-                  <span className="absolute -top-1.5 -right-3 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                    {unread}
-                  </span>
-                )}
-              </NavLink>
-            )}
-          </div>
-
-          {/* Right side */}
-          <div className="flex items-center gap-3">
-            {user ? (
-              <>
-                <Link to="/listings/new" className="hidden md:inline-flex btn-primary text-sm py-2 px-4">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Post
-                </Link>
-                <div className="relative" ref={dropRef}>
-                  <button onClick={() => setDropOpen(!dropOpen)} className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 transition-colors">
-                    {user.profileImage ? (
-                      <img src={user.profileImage} alt={user.name} className="w-8 h-8 rounded-lg object-cover" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                        {getInitials(user.name)}
-                      </div>
-                    )}
-                    <span className="hidden sm:block text-sm font-semibold text-gray-700 pr-1">{user.name.split(' ')[0]}</span>
-                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${dropOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {dropOpen && (
-                    <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50">
-                      <div className="px-4 py-2 border-b border-slate-100 mb-1">
-                        <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                        <p className="text-xs text-gray-400 truncate">{user.email}</p>
-                      </div>
-                      {[
-                        { label: 'Dashboard', to: '/dashboard', icon: '🏠' },
-                        { label: 'Profile', to: '/profile', icon: '👤' },
-                        { label: 'Favorites', to: '/favorites', icon: '❤️' },
-                        { label: 'Messages', to: '/messages', icon: '💬' },
-                      ].map((item) => (
-                        <Link key={item.to} to={item.to} onClick={() => setDropOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-slate-50 transition-colors">
-                          <span>{item.icon}</span>{item.label}
-                        </Link>
-                      ))}
-                      {user.role === 'admin' && (
-                        <Link to="/admin" onClick={() => setDropOpen(false)} className="flex items-center gap-3 px-4 py-2 text-sm text-blue-600 font-semibold hover:bg-blue-50 transition-colors">
-                          <span>⚙️</span>Admin Panel
-                        </Link>
-                      )}
-                      <div className="border-t border-slate-100 mt-1 pt-1">
-                        <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors">
-                          <span>🚪</span>Sign out
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link to="/login" className="btn-ghost text-sm">Sign in</Link>
-                <Link to="/register" className="btn-primary text-sm py-2 px-4">Join Free</Link>
-              </div>
-            )}
-
-            {/* Mobile menu button */}
-            <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-gray-600 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {menuOpen
-                  ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />}
-              </svg>
-            </button>
-          </div>
+          </> : <div className="flex items-center gap-1 sm:gap-2"><Link to="/login" className="btn-ghost text-paper/80 hover:bg-white/10 hover:text-paper">Sign in</Link><Link to="/register" className="hidden min-h-11 items-center rounded-[14px] bg-lime px-4 text-sm font-extrabold text-ink sm:inline-flex">Join KOBO</Link></div>}
         </div>
-
-        {/* Mobile menu */}
-        {menuOpen && (
-          <div className="md:hidden border-t border-slate-100 py-3 space-y-0.5">
-            {[
-              { to: '/marketplace', label: 'Marketplace' },
-              { to: '/services', label: 'Services' },
-              ...(user ? [
-                { to: '/messages', label: `Messages${unread > 0 ? ` (${unread})` : ''}` },
-                { to: '/dashboard', label: 'Dashboard' },
-                { to: '/listings/new', label: '+ Post Listing' },
-              ] : []),
-            ].map((item) => (
-              <NavLink key={item.to} to={item.to} onClick={() => setMenuOpen(false)}
-                className={({ isActive }) => `block px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${isActive ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-slate-100'}`}>
-                {item.label}
-              </NavLink>
-            ))}
-          </div>
-        )}
       </div>
-    </nav>
+    </header>
   );
 }

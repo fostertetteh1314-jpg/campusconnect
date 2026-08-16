@@ -1,8 +1,9 @@
-import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
+import { Camera, CheckCircle2, ShieldCheck } from 'lucide-react';
 import api from '../api';
-import { useAuth } from '../context/AuthContext';
-import { LEVELS, getInitials } from '../utils/helpers';
 import BackButton from '../components/BackButton';
+import { useAuth } from '../context/AuthContext';
+import { getInitials, LEVELS } from '../utils/helpers';
 
 export default function Profile() {
   const { user, updateUser } = useAuth();
@@ -13,87 +14,82 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleImage = (e) => {
-    const file = e.target.files[0];
+  useEffect(() => () => { if (preview.startsWith('blob:')) URL.revokeObjectURL(preview); }, [preview]);
+
+  const handleImage = (event) => {
+    const file = event.target.files[0];
     if (!file) return;
     setImage(file);
     setPreview(URL.createObjectURL(file));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(''); setSuccess('');
-    setLoading(true);
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError(''); setSuccess(''); setLoading(true);
     try {
       const data = new FormData();
-      Object.entries(form).forEach(([k, v]) => data.append(k, v));
+      Object.entries(form).forEach(([key, value]) => data.append(key, value));
       if (image) data.append('profileImage', image);
-      const res = await api.put('/auth/profile', data);
-      updateUser(res.data);
-      setSuccess('Profile updated successfully!');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Update failed');
+      const response = await api.put('/auth/profile', data);
+      updateUser(response.data);
+      setSuccess('Profile saved.');
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'We could not update your profile.');
     } finally { setLoading(false); }
   };
 
-  const f = (field) => ({ value: form[field], onChange: (e) => setForm({ ...form, [field]: e.target.value }) });
+  const field = (name) => ({ value: form[name], onChange: (event) => setForm((current) => ({ ...current, [name]: event.target.value })) });
 
   return (
-    <div className="max-w-lg mx-auto px-4 sm:px-6 py-8">
-      <BackButton label="Back to Dashboard" to="/dashboard" />
-      <h1 className="section-title mb-6">Edit Profile</h1>
+    <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
+      <BackButton label="Back to dashboard" to="/dashboard" />
+      <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.2em] text-cobalt">Your KOBO identity</p>
+      <h1 className="section-title mb-7 text-4xl sm:text-5xl">Make your profile feel real</h1>
 
-      {success && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-4 py-3 rounded-xl mb-5 flex items-center gap-2">✅ {success}</div>}
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl mb-5">{error}</div>}
+      {success && <div role="status" className="mb-5 flex items-center gap-2 rounded-[14px] bg-lime/50 px-4 py-3 text-sm font-bold"><CheckCircle2 className="h-4 w-4" />{success}</div>}
+      {error && <div role="alert" className="mb-5 rounded-[14px] bg-coral/10 px-4 py-3 text-sm font-semibold text-coral">{error}</div>}
 
-      <form onSubmit={handleSubmit} className="card p-6 space-y-5 shadow-sm">
-        {/* Avatar */}
-        <div className="flex items-center gap-5">
-          {preview ? (
-            <img src={preview} alt="" className="w-20 h-20 rounded-2xl object-cover shadow-md" />
-          ) : (
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-black shadow-md">
-              {getInitials(form.name)}
-            </div>
+      <form onSubmit={handleSubmit} className="card space-y-6 p-5 sm:p-8">
+        <div className="flex items-center gap-5 border-b border-ink/10 pb-6">
+          {preview ? <img src={preview} alt="Profile preview" className="h-20 w-20 rounded-[18px] object-cover shadow-card" /> : (
+            <div className="flex h-20 w-20 items-center justify-center rounded-[18px] bg-cobalt font-display text-3xl font-extrabold text-white shadow-card">{getInitials(form.name)}</div>
           )}
           <div>
-            <label className="cursor-pointer btn-secondary text-sm py-2 px-4">
-              📷 Change Photo
-              <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+            <label className="btn-secondary cursor-pointer text-sm">
+              <Camera aria-hidden="true" className="h-4 w-4" /> Change photo
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImage} className="sr-only" />
             </label>
-            <p className="text-xs text-slate-400 mt-2">JPG, PNG — max 5MB</p>
+            <p className="mt-2 text-xs text-muted">JPG, PNG or WebP, up to 5 MB</p>
           </div>
         </div>
-
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full Name</label>
-          <input required className="input-field" {...f('name')} />
+          <label htmlFor="profile-name" className="mb-1.5 block text-sm font-bold">Full name</label>
+          <input id="profile-name" required className="input-field" {...field('name')} />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email</label>
-          <input value={user?.email} disabled className="input-field bg-slate-50 text-slate-400 cursor-not-allowed" />
+          <label htmlFor="profile-email" className="mb-1.5 block text-sm font-bold">Email</label>
+          <input id="profile-email" value={user?.email || ''} disabled className="input-field cursor-not-allowed bg-ink/5 text-muted" />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Department</label>
-            <input className="input-field" placeholder="Computer Science" {...f('department')} />
+            <label htmlFor="profile-department" className="mb-1.5 block text-sm font-bold">Department</label>
+            <input id="profile-department" className="input-field" placeholder="Computer Science" {...field('department')} />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Level</label>
-            <select className="input-field" {...f('level')}>
-              <option value="">Select</option>
-              {LEVELS.map((l) => <option key={l} value={l}>Level {l}</option>)}
+            <label htmlFor="profile-level" className="mb-1.5 block text-sm font-bold">Level</label>
+            <select id="profile-level" className="input-field" {...field('level')}>
+              <option value="">Choose level</option>
+              {LEVELS.map((level) => <option key={level} value={level}>Level {level}</option>)}
             </select>
           </div>
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Phone</label>
-          <input className="input-field" placeholder="0xx xxx xxxx" {...f('phone')} />
+          <label htmlFor="profile-phone" className="mb-1.5 block text-sm font-bold">Phone</label>
+          <input id="profile-phone" required type="tel" className="input-field" placeholder="024 000 0000" {...field('phone')} />
+          <p className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />Changing your number clears verification until you confirm the new one.</p>
         </div>
-        <button type="submit" disabled={loading} className="btn-primary w-full py-3">
-          {loading ? 'Saving...' : 'Save Changes'}
-        </button>
+        <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Savingâ€¦' : 'Save changes'}</button>
       </form>
-    </div>
+    </main>
   );
 }

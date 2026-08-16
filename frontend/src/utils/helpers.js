@@ -1,5 +1,7 @@
 export const formatPrice = (price) =>
-  `GHS ${Number(price).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`;
+  new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS' }).format(Number(price));
+
+export const formatMinor = (amountMinor) => formatPrice(Number(amountMinor || 0) / 100);
 
 export const formatDate = (date) =>
   new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -24,7 +26,7 @@ export const LISTING_CATEGORIES = [
 ];
 
 export const SERVICE_CATEGORIES = [
-  'Typing', 'Graphic Design', 'Printing', 'Assignment Help', 'Programming', 'Tutorials', 'Other',
+  'Typing', 'Graphic Design', 'Printing', 'Academic Support', 'Programming', 'Tutorials', 'Other',
 ];
 
 export const CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor'];

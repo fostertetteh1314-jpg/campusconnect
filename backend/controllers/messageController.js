@@ -1,7 +1,8 @@
 const Message = require('../models/Message');
+const User = require('../models/User');
+const { ApiError, asyncHandler } = require('../middleware/errors');
 
-const getConversations = async (req, res) => {
-  try {
+const getConversations = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const messages = await Message.find({
       $or: [{ senderId: userId }, { receiverId: userId }],
@@ -22,14 +23,10 @@ const getConversations = async (req, res) => {
         conversations.push(msg);
       }
     }
-    res.json(conversations);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+  res.json(conversations);
+});
 
-const getMessages = async (req, res) => {
-  try {
+const getMessages = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const myId = req.user._id;
     const messages = await Message.find({
@@ -42,30 +39,23 @@ const getMessages = async (req, res) => {
       .sort({ createdAt: 1 });
 
     await Message.updateMany({ senderId: userId, receiverId: myId, read: false }, { read: true });
-    res.json(messages);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+  res.json(messages);
+});
 
-const sendMessage = async (req, res) => {
-  try {
+const sendMessage = asyncHandler(async (req, res) => {
     const { receiverId, message } = req.body;
+    if (receiverId === req.user._id.toString()) throw new ApiError(400, 'INVALID_RECIPIENT', 'You cannot message yourself');
+    if (!(await User.exists({ _id: receiverId, isBanned: false }))) {
+      throw new ApiError(404, 'RECIPIENT_NOT_FOUND', 'Recipient not found');
+    }
     const msg = await Message.create({ senderId: req.user._id, receiverId, message });
     const populated = await msg.populate('senderId', 'name profileImage');
     res.status(201).json(populated);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
-const getUnreadCount = async (req, res) => {
-  try {
+const getUnreadCount = asyncHandler(async (req, res) => {
     const count = await Message.countDocuments({ receiverId: req.user._id, read: false });
     res.json({ count });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
 module.exports = { getConversations, getMessages, sendMessage, getUnreadCount };

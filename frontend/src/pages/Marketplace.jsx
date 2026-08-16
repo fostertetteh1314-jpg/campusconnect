@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+﻿import { useCallback, useEffect, useState } from 'react';
+import { PackageOpen, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import ProductCard from '../components/ProductCard';
-import { LISTING_CATEGORIES, CONDITIONS } from '../utils/helpers';
+import { CONDITIONS, LISTING_CATEGORIES } from '../utils/helpers';
 
 export default function Marketplace() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -10,167 +11,63 @@ export default function Marketplace() {
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const search = searchParams.get('search') || '';
   const category = searchParams.get('category') || '';
   const condition = searchParams.get('condition') || '';
   const minPrice = searchParams.get('minPrice') || '';
   const maxPrice = searchParams.get('maxPrice') || '';
-  const page = Number(searchParams.get('page') || 1);
-
+  const page = Math.max(1, Number(searchParams.get('page') || 1));
   const [localSearch, setLocalSearch] = useState(search);
+  const hasFilters = Boolean(search || category || condition || minPrice || maxPrice);
 
   const fetchListings = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setError(false);
     try {
-      const params = { page, limit: 12 };
-      if (search) params.search = search;
-      if (category) params.category = category;
-      if (condition) params.condition = condition;
-      if (minPrice) params.minPrice = minPrice;
-      if (maxPrice) params.maxPrice = maxPrice;
-      const res = await api.get('/listings', { params });
-      setListings(res.data.listings);
-      setTotal(res.data.total);
-      setPages(res.data.pages);
-    } finally {
-      setLoading(false);
-    }
+      const params = { page, limit: 12, ...(search && { search }), ...(category && { category }), ...(condition && { condition }), ...(minPrice && { minPrice }), ...(maxPrice && { maxPrice }) };
+      const response = await api.get('/listings', { params });
+      setListings(response.data.listings || []); setTotal(response.data.total || 0); setPages(response.data.pages || 1);
+    } catch { setError(true); }
+    finally { setLoading(false); }
   }, [search, category, condition, minPrice, maxPrice, page]);
 
   useEffect(() => { fetchListings(); }, [fetchListings]);
+  useEffect(() => { setLocalSearch(search); }, [search]);
 
-  const setParam = (key, val) => {
-    const p = new URLSearchParams(searchParams);
-    if (val) p.set(key, val); else p.delete(key);
-    p.delete('page');
-    setSearchParams(p);
+  const setParam = (key, value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value); else next.delete(key);
+    if (key !== 'page') next.delete('page');
+    setSearchParams(next);
   };
+  const clearFilters = () => { setLocalSearch(''); setSearchParams({}); };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setParam('search', localSearch);
-  };
+  const Filters = () => (
+    <div className="space-y-7">
+      <div><h2 className="text-sm font-extrabold">Category</h2><div className="mt-3 flex flex-wrap gap-2 lg:flex-col">
+        <button onClick={() => setParam('category', '')} className={`min-h-11 rounded-[12px] px-3 text-left text-sm font-bold ${!category ? 'bg-ink text-paper' : 'bg-paper-bright text-ink/65 hover:text-ink'}`}>All categories</button>
+        {LISTING_CATEGORIES.map((value) => <button key={value} onClick={() => setParam('category', value)} className={`min-h-11 rounded-[12px] px-3 text-left text-sm font-bold ${category === value ? 'bg-ink text-paper' : 'bg-paper-bright text-ink/65 hover:text-ink'}`}>{value}</button>)}
+      </div></div>
+      <div><h2 className="text-sm font-extrabold">Condition</h2><div className="mt-3 flex flex-wrap gap-2 lg:flex-col">
+        <button onClick={() => setParam('condition', '')} className={`min-h-11 rounded-[12px] px-3 text-left text-sm font-bold ${!condition ? 'bg-lime text-ink' : 'bg-paper-bright text-ink/65'}`}>Any condition</button>
+        {CONDITIONS.map((value) => <button key={value} onClick={() => setParam('condition', value)} className={`min-h-11 rounded-[12px] px-3 text-left text-sm font-bold ${condition === value ? 'bg-lime text-ink' : 'bg-paper-bright text-ink/65'}`}>{value}</button>)}
+      </div></div>
+      <div><h2 className="text-sm font-extrabold">Price in GHâ‚µ</h2><div className="mt-3 grid grid-cols-2 gap-2"><label><span className="sr-only">Minimum price</span><input type="number" min="0" inputMode="decimal" placeholder="Min" value={minPrice} onChange={(event) => setParam('minPrice', event.target.value)} className="input-field" /></label><label><span className="sr-only">Maximum price</span><input type="number" min="0" inputMode="decimal" placeholder="Max" value={maxPrice} onChange={(event) => setParam('maxPrice', event.target.value)} className="input-field" /></label></div></div>
+      {hasFilters && <button onClick={clearFilters} className="inline-flex min-h-11 items-center gap-2 text-sm font-extrabold text-coral"><X className="h-4 w-4" />Clear filters</button>}
+    </div>
+  );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Marketplace</h1>
-        <p className="text-gray-500 mt-1">{total} item{total !== 1 ? 's' : ''} available</p>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Sidebar filters */}
-        <aside className="lg:w-56 shrink-0 space-y-5">
-          {/* Search */}
-          <form onSubmit={handleSearch}>
-            <div className="relative">
-              <input
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                placeholder="Search items..."
-                className="input-field pr-10 text-sm"
-              />
-              <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-            </div>
-          </form>
-
-          {/* Category */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Category</p>
-            <div className="space-y-1">
-              <button onClick={() => setParam('category', '')} className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${!category ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}>All Categories</button>
-              {LISTING_CATEGORIES.map((c) => (
-                <button key={c} onClick={() => setParam('category', c)} className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${category === c ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}>{c}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Condition */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Condition</p>
-            <div className="space-y-1">
-              <button onClick={() => setParam('condition', '')} className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${!condition ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}>Any Condition</button>
-              {CONDITIONS.map((c) => (
-                <button key={c} onClick={() => setParam('condition', c)} className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${condition === c ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}>{c}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Price */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Price (GHS)</p>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                placeholder="Min"
-                value={minPrice}
-                onChange={(e) => setParam('minPrice', e.target.value)}
-                className="input-field text-sm w-full py-1.5"
-              />
-              <input
-                type="number"
-                placeholder="Max"
-                value={maxPrice}
-                onChange={(e) => setParam('maxPrice', e.target.value)}
-                className="input-field text-sm w-full py-1.5"
-              />
-            </div>
-          </div>
-
-          {(search || category || condition || minPrice || maxPrice) && (
-            <button onClick={() => { setLocalSearch(''); setSearchParams({}); }} className="text-sm text-red-600 hover:underline">
-              Clear all filters
-            </button>
-          )}
-        </aside>
-
-        {/* Grid */}
-        <div className="flex-1">
-          {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {[...Array(12)].map((_, i) => (
-                <div key={i} className="card animate-pulse">
-                  <div className="aspect-[4/3] bg-gray-200" />
-                  <div className="p-3 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-3/4" />
-                    <div className="h-4 bg-gray-200 rounded w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : listings.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-gray-400 text-lg">No items found</p>
-              <p className="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                {listings.map((l) => <ProductCard key={l._id} listing={l} onFavoriteChange={fetchListings} />)}
-              </div>
-
-              {/* Pagination */}
-              {pages > 1 && (
-                <div className="flex justify-center gap-2 mt-8">
-                  {[...Array(pages)].map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { const p = new URLSearchParams(searchParams); p.set('page', i + 1); setSearchParams(p); }}
-                      className={`w-9 h-9 rounded-lg text-sm font-medium ${page === i + 1 ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+    <div className="min-h-screen">
+      <section className="bg-ink text-paper"><div className="mx-auto max-w-7xl px-4 py-9 sm:px-6 md:px-8 md:py-12"><h1 className="display-type text-5xl leading-none md:text-7xl">Marketplace</h1><p className="mt-3 max-w-xl text-sm leading-6 text-paper/65 sm:text-base">Browse items around campus. Use search and filters to narrow the board.</p><form onSubmit={(event) => { event.preventDefault(); setParam('search', localSearch.trim()); }} role="search" className="mt-6 flex max-w-2xl items-center rounded-[14px] bg-paper-bright p-2"><Search className="ml-2 h-5 w-5 text-muted" /><label htmlFor="market-search" className="sr-only">Search marketplace</label><input id="market-search" value={localSearch} onChange={(event) => setLocalSearch(event.target.value)} placeholder="Search items" className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-sm font-semibold text-ink placeholder:text-muted focus:outline-none" /><button className="btn-primary px-4">Search</button></form></div></section>
+      <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 md:px-8 md:py-10">
+        <div className="mb-6 flex items-center justify-between gap-4"><p aria-live="polite" className="text-sm font-semibold text-muted">{loading ? 'Loading itemsâ€¦' : `${total} item${total === 1 ? '' : 's'}`}</p><button onClick={() => setFiltersOpen((value) => !value)} aria-expanded={filtersOpen} className="btn-secondary px-4 lg:hidden"><SlidersHorizontal className="h-4 w-4" />Filters</button></div>
+        {filtersOpen && <aside className="notice-slip mb-6 p-5 lg:hidden"><Filters /></aside>}
+        <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]"><aside className="hidden lg:block"><Filters /></aside><main>
+          {error ? <div className="notice-slip p-8"><h2 className="text-lg font-extrabold">We couldnâ€™t load the marketplace.</h2><p className="mt-2 text-sm text-muted">Check your connection and try again.</p><button onClick={fetchListings} className="btn-primary mt-5">Try again</button></div> : loading ? <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-72 animate-pulse rounded-[14px] bg-ink/10" />)}</div> : listings.length === 0 ? <div className="notice-slip flex min-h-80 flex-col items-center justify-center p-8 text-center"><PackageOpen className="h-10 w-10 text-ink/35" /><h2 className="display-type mt-5 text-3xl">No items found</h2><p className="mt-2 max-w-sm text-sm leading-6 text-muted">Try a different search or clear the filters. You can also post the first matching listing.</p><div className="mt-5 flex flex-wrap justify-center gap-3">{hasFilters && <button onClick={clearFilters} className="btn-secondary">Clear filters</button>}<Link to="/listings/new" className="btn-primary">Post a listing</Link></div></div> : <><div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">{listings.map((listing) => <ProductCard key={listing._id} listing={listing} onFavoriteChange={fetchListings} />)}</div>{pages > 1 && <nav aria-label="Pagination" className="mt-9 flex flex-wrap justify-center gap-2">{Array.from({ length: pages }).map((_, index) => <button key={index} onClick={() => setParam('page', String(index + 1))} aria-current={page === index + 1 ? 'page' : undefined} className={`h-11 min-w-11 rounded-[12px] text-sm font-extrabold ${page === index + 1 ? 'bg-ink text-paper' : 'bg-paper-bright text-ink shadow-card'}`}>{index + 1}</button>)}</nav>}</>}
+        </main></div>
       </div>
     </div>
   );

@@ -1,27 +1,28 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { ApiError, asyncHandler } = require('./errors');
 
-const protect = async (req, res, next) => {
+const protect = asyncHandler(async (req, _res, next) => {
   let token;
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
       req.user = await User.findById(decoded.id).select('-password');
-      if (!req.user) return res.status(401).json({ message: 'User not found' });
-      if (req.user.isBanned) return res.status(403).json({ message: 'Account has been banned' });
-      next();
-    } catch {
-      return res.status(401).json({ message: 'Invalid token' });
+      if (!req.user) throw new ApiError(401, 'AUTH_USER_NOT_FOUND', 'User not found');
+      if (req.user.isBanned) throw new ApiError(403, 'ACCOUNT_SUSPENDED', 'Account has been suspended');
+      return next();
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(401, 'INVALID_TOKEN', 'Your session is invalid or has expired');
     }
-  } else {
-    return res.status(401).json({ message: 'Not authorized, no token' });
   }
-};
+  throw new ApiError(401, 'AUTH_REQUIRED', 'Sign in to continue');
+});
 
 const adminOnly = (req, res, next) => {
   if (req.user && req.user.role === 'admin') return next();
-  return res.status(403).json({ message: 'Admin access required' });
+  return next(new ApiError(403, 'ADMIN_REQUIRED', 'Admin access required'));
 };
 
 module.exports = { protect, adminOnly };

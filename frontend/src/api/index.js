@@ -1,28 +1,38 @@
 import axios from 'axios';
 
-const isProd = import.meta.env.PROD;
-const api = axios.create({
-  baseURL: isProd
-    ? 'https://campusconnect-1a9b.onrender.com/api'
-    : '/api',
-});
+const baseURL = import.meta.env.VITE_API_URL || '/api';
+let accessToken = null;
+let refreshPromise = null;
+
+export const setAccessToken = (token) => { accessToken = token || null; };
+export const getAccessToken = () => accessToken;
+
+const api = axios.create({ baseURL, timeout: 15_000, withCredentials: true });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   return config;
 });
 
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(err);
+const refreshAccess = async () => {
+  if (!refreshPromise) {
+    refreshPromise = axios.post(`${baseURL}/auth/refresh`, {}, { withCredentials: true, timeout: 15_000, headers: { 'X-KOBO-Refresh': '1' } })
+      .then((response) => { setAccessToken(response.data.token); return response.data; })
+      .finally(() => { refreshPromise = null; });
   }
-);
+  return refreshPromise;
+};
 
+api.interceptors.response.use((response) => response, async (error) => {
+  const original = error.config;
+  const path = String(original?.url || '');
+  if (error.response?.status === 401 && original && !original._retried && !path.includes('/auth/login') && !path.includes('/auth/register') && !path.includes('/auth/refresh')) {
+    original._retried = true;
+    try { await refreshAccess(); original.headers.Authorization = `Bearer ${accessToken}`; return api(original); }
+    catch { setAccessToken(null); }
+  }
+  return Promise.reject(error);
+});
+
+export { refreshAccess };
 export default api;

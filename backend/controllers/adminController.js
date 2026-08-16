@@ -2,9 +2,9 @@ const User = require('../models/User');
 const Listing = require('../models/Listing');
 const Service = require('../models/Service');
 const Report = require('../models/Report');
+const { ApiError, asyncHandler } = require('../middleware/errors');
 
-const getStats = async (req, res) => {
-  try {
+const getStats = asyncHandler(async (req, res) => {
     const [users, listings, services, reports] = await Promise.all([
       User.countDocuments(),
       Listing.countDocuments(),
@@ -12,84 +12,54 @@ const getStats = async (req, res) => {
       Report.countDocuments({ status: 'pending' }),
     ]);
     res.json({ users, listings, services, pendingReports: reports });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
-const getAllUsers = async (req, res) => {
-  try {
+const getAllUsers = asyncHandler(async (req, res) => {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
     res.json(users);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
-const banUser = async (req, res) => {
-  try {
+const banUser = asyncHandler(async (req, res) => {
+    if (req.params.id === req.user._id.toString()) throw new ApiError(400, 'SELF_SUSPENSION_DENIED', 'You cannot suspend your own account');
     const user = await User.findByIdAndUpdate(req.params.id, { isBanned: true }, { new: true }).select('-password');
+    if (!user) throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
     res.json(user);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
-const unbanUser = async (req, res) => {
-  try {
+const unbanUser = asyncHandler(async (req, res) => {
     const user = await User.findByIdAndUpdate(req.params.id, { isBanned: false }, { new: true }).select('-password');
+    if (!user) throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
     res.json(user);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
-const getAllListings = async (req, res) => {
-  try {
+const getAllListings = asyncHandler(async (req, res) => {
     const listings = await Listing.find().populate('sellerId', 'name email').sort({ createdAt: -1 });
     res.json(listings);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
-const adminDeleteListing = async (req, res) => {
-  try {
-    await Listing.findByIdAndDelete(req.params.id);
+const adminDeleteListing = asyncHandler(async (req, res) => {
+    const listing = await Listing.findByIdAndDelete(req.params.id);
+    if (!listing) throw new ApiError(404, 'LISTING_NOT_FOUND', 'Listing not found');
     res.json({ message: 'Listing deleted' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
-const getReports = async (req, res) => {
-  try {
+const getReports = asyncHandler(async (req, res) => {
     const reports = await Report.find()
       .populate('reporterId', 'name email')
       .sort({ createdAt: -1 });
     res.json(reports);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
-const updateReportStatus = async (req, res) => {
-  try {
+const updateReportStatus = asyncHandler(async (req, res) => {
     const report = await Report.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+    if (!report) throw new ApiError(404, 'REPORT_NOT_FOUND', 'Report not found');
     res.json(report);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
-const createReport = async (req, res) => {
-  try {
+const createReport = asyncHandler(async (req, res) => {
     const { targetType, targetId, reason } = req.body;
     const report = await Report.create({ reporterId: req.user._id, targetType, targetId, reason });
     res.status(201).json(report);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+});
 
 module.exports = { getStats, getAllUsers, banUser, unbanUser, getAllListings, adminDeleteListing, getReports, updateReportStatus, createReport };

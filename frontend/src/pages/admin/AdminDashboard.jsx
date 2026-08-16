@@ -1,55 +1,11 @@
-import { useState, useEffect } from 'react';
+﻿import { useEffect, useState } from 'react';
+import { Flag, Package, Scale, Users, Wrench } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
-
-  useEffect(() => {
-    api.get('/admin/stats').then((r) => setStats(r.data));
-  }, []);
-
-  const cards = stats ? [
-    { label: 'Total Users', value: stats.users, icon: '👥', link: '/admin/users', color: 'bg-blue-50 text-blue-700' },
-    { label: 'Listings', value: stats.listings, icon: '📦', link: '/admin/listings', color: 'bg-green-50 text-green-700' },
-    { label: 'Services', value: stats.services, icon: '🛠️', link: '/admin/listings', color: 'bg-purple-50 text-purple-700' },
-    { label: 'Pending Reports', value: stats.pendingReports, icon: '🚨', link: '/admin/reports', color: 'bg-red-50 text-red-700' },
-  ] : [];
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-      <p className="text-gray-500 mb-8">Manage CampusConnect</p>
-
-      {!stats ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="card p-6 h-28 animate-pulse bg-gray-100" />)}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          {cards.map((c) => (
-            <Link key={c.label} to={c.link} className="card p-5 hover:shadow-md transition-shadow">
-              <p className="text-3xl mb-2">{c.icon}</p>
-              <p className={`text-2xl font-bold ${c.color.split(' ')[1]}`}>{c.value}</p>
-              <p className="text-sm text-gray-500 mt-0.5">{c.label}</p>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: 'Manage Users', desc: 'View, ban, and manage student accounts', link: '/admin/users', icon: '👥' },
-          { label: 'Manage Listings', desc: 'Review and remove inappropriate listings', link: '/admin/listings', icon: '📦' },
-          { label: 'Reports', desc: 'Review pending reports from students', link: '/admin/reports', icon: '🚨' },
-        ].map((item) => (
-          <Link key={item.label} to={item.link} className="card p-5 hover:shadow-md transition-shadow group">
-            <p className="text-2xl mb-2">{item.icon}</p>
-            <p className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{item.label}</p>
-            <p className="text-sm text-gray-500 mt-1">{item.desc}</p>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
+  useEffect(() => { api.get('/admin/stats').then((response) => setStats(response.data)); }, []);
+  const cards = stats ? [{ label: 'Users', value: stats.users, icon: Users, link: '/admin/users', tone: 'bg-cobalt text-white' }, { label: 'Listings', value: stats.listings, icon: Package, link: '/admin/listings', tone: 'bg-lime text-ink' }, { label: 'Services', value: stats.services, icon: Wrench, link: '/admin/listings', tone: 'bg-mango text-ink' }, { label: 'Reports', value: stats.pendingReports, icon: Flag, link: '/admin/reports', tone: 'bg-coral text-white' }] : [];
+  return <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 md:px-8 md:py-12"><h1 className="display-type text-5xl leading-none">Admin</h1><p className="mt-3 text-sm text-muted">Moderation, finance, and operational controls.</p>{!stats ? <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-32 animate-pulse rounded-[14px] bg-ink/10" />)}</div> : <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">{cards.map(({ label, value, icon: Icon, link, tone }) => <Link key={label} to={link} className={`rounded-[14px] p-5 shadow-card transition hover:-translate-y-0.5 ${tone}`}><Icon className="h-6 w-6" /><strong className="mt-7 block text-3xl">{value}</strong><span className="mt-1 block text-sm font-bold opacity-70">{label}</span></Link>)}</div>}<div className="mt-8 grid gap-3 md:grid-cols-2"><Link to="/admin/finance" className="notice-slip group flex min-h-32 items-center gap-4 p-5 transition hover:shadow-card-hover"><span className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-ink text-paper"><Scale className="h-5 w-5" /></span><span><strong className="block">Finance controls</strong><span className="mt-1 block text-sm text-muted">Review disputes, withdrawals, refunds, and audit records.</span></span></Link><Link to="/admin/reports" className="notice-slip group flex min-h-32 items-center gap-4 p-5 transition hover:shadow-card-hover"><span className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-coral text-white"><Flag className="h-5 w-5" /></span><span><strong className="block">Content reports</strong><span className="mt-1 block text-sm text-muted">Review reports and moderation decisions.</span></span></Link></div></div>;
 }

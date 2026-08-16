@@ -6,7 +6,10 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "test": "npm --prefix backend test",
+    "check": "npm --prefix backend run check && npm --prefix frontend run check",
+    "check:cloudflare": "npm --prefix cloudflare run check"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

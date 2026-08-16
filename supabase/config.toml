@@ -1,0 +1,18 @@
+project_id = "kobo-campus-marketplace"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["https://kobo-campus-marketplace.vercel.app"]
+jwt_expiry = 900
+enable_signup = true
+
+[functions.api]
+verify_jwt = false

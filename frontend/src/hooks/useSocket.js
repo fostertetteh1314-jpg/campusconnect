@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
+import { getAccessToken } from '../api';
 
 let socketInstance = null;
 
@@ -10,10 +11,11 @@ export const useSocket = () => {
 
   useEffect(() => {
     if (user && !socketInstance) {
-      const socketUrl = import.meta.env.PROD ? 'https://campusconnect-1a9b.onrender.com' : '/';
+      const socketUrl = import.meta.env.VITE_SOCKET_URL || '/';
       socketInstance = io(socketUrl, {
-        query: { userId: user._id },
+        auth: (callback) => callback({ token: getAccessToken() }),
         transports: ['websocket'],
+        reconnectionDelayMax: 5_000,
       });
     }
     socketRef.current = socketInstance;

@@ -1,144 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
+import { BadgeDollarSign, Send, X } from 'lucide-react';
+import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../hooks/useSocket';
-import api from '../api';
-import { formatRelativeTime, getInitials } from '../utils/helpers';
+import { formatMinor, formatRelativeTime, getInitials } from '../utils/helpers';
 
-export default function ChatBox({ recipientId, recipientName, recipientImage }) {
+export default function ChatBox({ conversation }) {
   const { user } = useAuth();
   const socket = useSocket();
-  const [messages, setMessages] = useState([]);
+  const [detail, setDetail] = useState({ conversation, messages: [], offers: [] });
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [typing, setTyping] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [offer, setOffer] = useState({ amount: '', note: '' });
   const bottomRef = useRef(null);
-  const typingTimer = useRef(null);
+  const other = detail.conversation.participants?.find((participant) => String(participant._id || participant) !== String(user._id));
 
-  useEffect(() => {
-    setLoading(true);
-    api.get(`/messages/${recipientId}`)
-      .then((r) => setMessages(r.data))
-      .finally(() => setLoading(false));
-  }, [recipientId]);
+  const load = () => api.get(`/v1/conversations/${conversation._id}`).then((response) => setDetail(response.data)).finally(() => setLoading(false));
+  useEffect(load, [conversation._id]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [detail.messages]);
+  useEffect(() => { if (!socket) return undefined; const onMessage = (message) => { if (String(message.conversationId) === String(conversation._id)) setDetail((current) => current.messages.some((item) => item._id === message._id) ? current : { ...current, messages: [...current.messages, message] }); }; socket.on('newMessage', onMessage); return () => socket.off('newMessage', onMessage); }, [socket, conversation._id]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  useEffect(() => {
-    if (!socket) return;
-    const handleNew = (msg) => {
-      if (
-        (msg.senderId._id === recipientId || msg.senderId === recipientId) &&
-        msg.receiverId === user._id
-      ) {
-        setMessages((prev) => [...prev, msg]);
-      }
-    };
-    const handleTyping = ({ senderId }) => {
-      if (senderId === recipientId) setTyping(true);
-    };
-    const handleStop = ({ senderId }) => {
-      if (senderId === recipientId) setTyping(false);
-    };
-    socket.on('newMessage', handleNew);
-    socket.on('userTyping', handleTyping);
-    socket.on('userStoppedTyping', handleStop);
-    return () => {
-      socket.off('newMessage', handleNew);
-      socket.off('userTyping', handleTyping);
-      socket.off('userStoppedTyping', handleStop);
-    };
-  }, [socket, recipientId, user._id]);
-
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!text.trim()) return;
-    const msgText = text.trim();
-    setText('');
-
-    if (socket) {
-      socket.emit('sendMessage', { receiverId: recipientId, message: msgText, senderId: user._id });
-      socket.on('messageSent', (msg) => {
-        setMessages((prev) => {
-          if (prev.find((m) => m._id === msg._id)) return prev;
-          return [...prev, msg];
-        });
-        socket.off('messageSent');
-      });
-    } else {
-      const res = await api.post('/messages', { receiverId: recipientId, message: msgText });
-      setMessages((prev) => [...prev, res.data]);
-    }
-  };
-
-  const handleTypingInput = (e) => {
-    setText(e.target.value);
-    if (!socket) return;
-    socket.emit('typing', { receiverId: recipientId, senderId: user._id });
-    clearTimeout(typingTimer.current);
-    typingTimer.current = setTimeout(() => {
-      socket.emit('stopTyping', { receiverId: recipientId, senderId: user._id });
-    }, 1500);
-  };
+  const send = async (event) => { event.preventDefault(); const message = text.trim(); if (!message || sending) return; setSending(true); setText(''); try { const response = await api.post(`/v1/conversations/${conversation._id}/messages`, { message }); setDetail((current) => ({ ...current, messages: [...current.messages, response.data] })); } catch { setText(message); } finally { setSending(false); } };
+  const submitOffer = async (event) => { event.preventDefault(); setSending(true); try { await api.post(`/v1/conversations/${conversation._id}/offers`, { recipientId: other._id, subjectType: detail.conversation.contextType, subjectId: detail.conversation.contextId, amountMinor: Math.round(Number(offer.amount) * 100), note: offer.note, expiresInHours: 48 }); setOffer({ amount: '', note: '' }); setOfferOpen(false); load(); } finally { setSending(false); } };
+  const respond = async (id, action) => { await api.patch(`/v1/conversations/offers/${id}`, { action }); load(); };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-3">
-        {recipientImage ? (
-          <img src={recipientImage} alt={recipientName} className="w-9 h-9 rounded-full object-cover" />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
-            {getInitials(recipientName)}
-          </div>
-        )}
-        <div>
-          <p className="font-semibold text-sm">{recipientName}</p>
-          {typing && <p className="text-xs text-gray-400 animate-pulse">typing...</p>}
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : messages.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm py-8">No messages yet. Say hello!</p>
-        ) : (
-          messages.map((msg) => {
-            const mine = (msg.senderId?._id || msg.senderId) === user._id;
-            return (
-              <div key={msg._id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[70%] px-3 py-2 rounded-2xl text-sm ${mine ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm'}`}>
-                  <p>{msg.message}</p>
-                  <p className={`text-xs mt-0.5 ${mine ? 'text-blue-200' : 'text-gray-400'}`}>
-                    {formatRelativeTime(msg.createdAt)}
-                  </p>
-                </div>
-              </div>
-            );
-          })
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input */}
-      <form onSubmit={handleSend} className="px-4 py-3 border-t border-gray-200 bg-white flex gap-2">
-        <input
-          value={text}
-          onChange={handleTypingInput}
-          placeholder="Type a message..."
-          className="flex-1 input-field py-2 text-sm"
-        />
-        <button type="submit" disabled={!text.trim()} className="btn-primary py-2 px-4 text-sm">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-        </button>
-      </form>
-    </div>
+    <div className="flex h-full flex-col"><header className="flex min-h-16 items-center gap-3 border-b border-ink/10 px-4"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-ink text-xs font-extrabold text-paper">{other?.profileImage ? <img src={other.profileImage} alt="" className="h-full w-full object-cover" /> : getInitials(other?.name || '?')}</span><div><p className="text-sm font-extrabold">{other?.name || 'KOBO user'}</p><p className="text-xs capitalize text-muted">{detail.conversation.contextType === 'general' ? 'Direct message' : `About a ${detail.conversation.contextType}`}</p></div></header><div className="flex-1 overflow-y-auto bg-paper p-4"><div className="space-y-3">{loading ? <div className="h-20 animate-pulse rounded-[14px] bg-ink/10" /> : detail.messages.length === 0 && detail.offers.length === 0 ? <p className="py-12 text-center text-sm text-muted">No messages yet. Start with the item, price, or meetup details.</p> : <>{detail.offers.map((item) => { const mine = String(item.createdBy) === String(user._id); return <div key={item._id} className={`max-w-sm rounded-[14px] p-4 shadow-card ${mine ? 'ml-auto bg-cobalt text-white' : 'bg-mango text-ink'}`}><div className="flex items-center gap-2 text-xs font-extrabold"><BadgeDollarSign className="h-4 w-4" />OFFER Â· {item.status.toUpperCase()}</div><p className="mt-3 text-2xl font-extrabold">{formatMinor(item.amountMinor)}</p>{item.note && <p className="mt-2 text-sm opacity-75">{item.note}</p>}{!mine && item.status === 'pending' && <div className="mt-4 flex gap-2"><button onClick={() => respond(item._id, 'accept')} className="min-h-10 rounded-[10px] bg-ink px-4 text-xs font-extrabold text-paper">Accept</button><button onClick={() => respond(item._id, 'decline')} className="min-h-10 rounded-[10px] px-4 text-xs font-extrabold">Decline</button></div>}</div>; })}{detail.messages.map((message) => { const mine = String(message.senderId?._id || message.senderId) === String(user._id); return <div key={message._id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[78%] rounded-[14px] px-4 py-3 text-sm shadow-card ${mine ? 'rounded-br-sm bg-ink text-paper' : 'rounded-bl-sm bg-paper-bright text-ink'}`}><p className="leading-6">{message.message}</p><p className={`mt-1 text-[10px] ${mine ? 'text-paper/75' : 'text-ink/35'}`}>{formatRelativeTime(message.createdAt)}</p></div></div>; })}</>}</div><div ref={bottomRef} /></div>{offerOpen && <form onSubmit={submitOffer} className="border-t border-ink/10 bg-mango p-4"><div className="flex items-center justify-between"><strong className="text-sm">Make an offer</strong><button type="button" onClick={() => setOfferOpen(false)} className="flex h-10 w-10 items-center justify-center"><X className="h-4 w-4" /></button></div><div className="mt-3 grid gap-2 sm:grid-cols-[140px_1fr_auto]"><input required min="0.01" step="0.01" type="number" value={offer.amount} onChange={(event) => setOffer({ ...offer, amount: event.target.value })} placeholder="Amount in GHâ‚µ" className="input-field" /><input value={offer.note} onChange={(event) => setOffer({ ...offer, note: event.target.value })} placeholder="Optional note" className="input-field" /><button disabled={sending} className="min-h-11 rounded-[14px] bg-ink px-5 text-sm font-extrabold text-paper">Send offer</button></div></form>}<form onSubmit={send} className="flex gap-2 border-t border-ink/10 bg-paper-bright p-3">{['listing', 'service'].includes(detail.conversation.contextType) && !offerOpen && <button type="button" onClick={() => setOfferOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-mango" aria-label="Make an offer"><BadgeDollarSign className="h-5 w-5" /></button>}<label className="sr-only" htmlFor="message-text">Message</label><input id="message-text" value={text} onChange={(event) => setText(event.target.value)} placeholder="Write a message" className="input-field flex-1" /><button disabled={!text.trim() || sending} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-cobalt text-white disabled:opacity-40" aria-label="Send message"><Send className="h-4 w-4" /></button></form></div>
   );
 }

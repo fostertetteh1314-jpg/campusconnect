@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kobo-api-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-16",
+  "observability": { "enabled": true },
+  "vars": {
+    "ALLOWED_ORIGINS": "https://kobo-campus-marketplace.vercel.app",
+    "UPSTREAM_API_ORIGIN": "https://PROJECT_REF.supabase.co/functions/v1/api"
+  },
+  "secrets": { "required": ["GATEWAY_SHARED_SECRET"] }
+}

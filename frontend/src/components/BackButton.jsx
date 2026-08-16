@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
 export default function BackButton({ label = 'Back', to }) {
   const navigate = useNavigate();
@@ -6,9 +7,7 @@ export default function BackButton({ label = 'Back', to }) {
 
   return (
     <button onClick={handleClick} className="back-btn mb-6">
-      <svg className="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-      </svg>
+      <ArrowLeft aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
       {label}
     </button>
   );

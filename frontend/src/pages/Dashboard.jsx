@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+﻿import { useEffect, useState } from 'react';
+import { Heart, MessageCircle, Package, Plus, ReceiptText, ShieldCheck, UserRound, WalletCards, Wrench } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -10,157 +11,17 @@ export default function Dashboard() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('listings');
-
-  useEffect(() => {
-    Promise.all([api.get('/listings/my'), api.get('/services/my')])
-      .then(([l, s]) => { setListings(l.data); setServices(s.data); })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const deleteListing = async (id) => {
-    if (!confirm('Delete this listing?')) return;
-    await api.delete(`/listings/${id}`);
-    setListings((prev) => prev.filter((l) => l._id !== id));
-  };
-
-  const deleteService = async (id) => {
-    if (!confirm('Delete this service?')) return;
-    await api.delete(`/services/${id}`);
-    setServices((prev) => prev.filter((s) => s._id !== id));
-  };
+  useEffect(() => { Promise.all([api.get('/listings/my'), api.get('/services/my')]).then(([listingResponse, serviceResponse]) => { setListings(listingResponse.data); setServices(serviceResponse.data); }).finally(() => setLoading(false)); }, []);
+  const remove = async (kind, id) => { if (!window.confirm(`Remove this ${kind}?`)) return; await api.delete(`/${kind === 'listing' ? 'listings' : 'services'}/${id}`); if (kind === 'listing') setListings((items) => items.filter((item) => item._id !== id)); else setServices((items) => items.filter((item) => item._id !== id)); };
+  const shortcuts = [{ label: 'Orders', to: '/orders', icon: ReceiptText }, { label: 'Messages', to: '/messages', icon: MessageCircle }, { label: 'Wallet', to: '/wallet', icon: WalletCards }, { label: 'Saved', to: '/favorites', icon: Heart }];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Profile header */}
-      <div className="card p-6 mb-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {user?.profileImage ? (
-              <img src={user.profileImage} alt={user.name} className="w-16 h-16 rounded-2xl object-cover border-2 border-white/30" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-white text-2xl font-black">
-                {getInitials(user?.name)}
-              </div>
-            )}
-            <div>
-              <h1 className="text-xl font-black">{user?.name}</h1>
-              <p className="text-blue-200 text-sm mt-0.5">
-                {user?.department}{user?.level ? ` · Level ${user.level}` : ''}
-              </p>
-              <p className="text-blue-100 text-xs mt-1">{user?.email}</p>
-            </div>
-          </div>
-          <Link to="/profile" className="bg-white/20 hover:bg-white/30 backdrop-blur text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors border border-white/20">
-            Edit Profile
-          </Link>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Listings', value: listings.length, icon: '📦', color: 'text-blue-600' },
-          { label: 'Services', value: services.length, icon: '🛠️', color: 'text-purple-600' },
-          { label: 'Favorites', value: null, icon: '❤️', link: '/favorites' },
-          { label: 'Messages', value: null, icon: '💬', link: '/messages' },
-        ].map((s) => (
-          <div key={s.label} className="card p-4 hover:shadow-md transition-shadow">
-            {s.link ? (
-              <Link to={s.link} className="block">
-                <span className="text-2xl">{s.icon}</span>
-                <p className="text-sm font-semibold text-slate-500 mt-1">{s.label} →</p>
-              </Link>
-            ) : (
-              <>
-                <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-                <p className="text-sm text-slate-500 mt-0.5">{s.icon} {s.label}</p>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Quick actions */}
-      <div className="flex gap-3 mb-6">
-        <Link to="/listings/new" className="btn-primary text-sm">+ Post Listing</Link>
-        <Link to="/services/new" className="btn-secondary text-sm">+ Offer Service</Link>
-        <Link to="/marketplace" className="btn-ghost text-sm">Browse Market →</Link>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-5 w-fit">
-        {['listings', 'services'].map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all capitalize ${tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-700'}`}>
-            {t} ({t === 'listings' ? listings.length : services.length})
-          </button>
-        ))}
-      </div>
-
-      {/* Listings tab */}
-      {tab === 'listings' && (
-        loading ? (
-          <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="card p-4 h-20 animate-pulse bg-slate-100" />)}</div>
-        ) : listings.length === 0 ? (
-          <div className="card p-12 text-center">
-            <p className="text-5xl mb-3">📦</p>
-            <p className="text-slate-500 font-medium">No listings yet</p>
-            <Link to="/listings/new" className="btn-primary mt-4 text-sm">Post your first listing</Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {listings.map((l) => (
-              <div key={l._id} className="card p-4 flex items-center gap-4 hover:shadow-md transition-shadow">
-                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                  {l.images?.[0] ? <img src={l.images[0]} alt="" className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{l.title}</p>
-                  <p className="text-blue-600 font-bold text-sm">{formatPrice(l.price)}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{l.category} · {formatRelativeTime(l.createdAt)}</p>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <Link to={`/listings/${l._id}`} className="btn-ghost text-xs py-1.5 px-3">View</Link>
-                  <Link to={`/listings/${l._id}/edit`} className="btn-secondary text-xs py-1.5 px-3">Edit</Link>
-                  <button onClick={() => deleteListing(l._id)} className="text-xs py-1.5 px-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-semibold transition-colors">Delete</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      )}
-
-      {/* Services tab */}
-      {tab === 'services' && (
-        loading ? (
-          <div className="space-y-3">{[...Array(2)].map((_, i) => <div key={i} className="card p-4 h-20 animate-pulse bg-slate-100" />)}</div>
-        ) : services.length === 0 ? (
-          <div className="card p-12 text-center">
-            <p className="text-5xl mb-3">🛠️</p>
-            <p className="text-slate-500 font-medium">No services yet</p>
-            <Link to="/services/new" className="btn-primary mt-4 text-sm">Offer your first service</Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {services.map((s) => (
-              <div key={s._id} className="card p-4 flex items-center gap-4 hover:shadow-md transition-shadow">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-2xl shrink-0">🛠️</div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{s.title}</p>
-                  <p className="text-blue-600 font-bold text-sm">From {formatPrice(s.price)}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{s.category} · {formatRelativeTime(s.createdAt)}</p>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <Link to={`/services/${s._id}`} className="btn-ghost text-xs py-1.5 px-3">View</Link>
-                  <Link to={`/services/${s._id}/edit`} className="btn-secondary text-xs py-1.5 px-3">Edit</Link>
-                  <button onClick={() => deleteService(s._id)} className="text-xs py-1.5 px-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-semibold transition-colors">Delete</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      )}
-    </div>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 md:px-8 md:py-12"><section className="rounded-[14px] bg-ink p-6 text-paper md:p-8"><div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-4">{user?.profileImage ? <img src={user.profileImage} alt="" className="h-16 w-16 rounded-[14px] object-cover" /> : <span className="flex h-16 w-16 items-center justify-center rounded-[14px] bg-lime text-xl font-extrabold text-ink">{getInitials(user?.name)}</span>}<div><p className="text-xs font-bold text-paper/75">YOUR KOBO</p><h1 className="mt-1 text-2xl font-extrabold">{user?.name}</h1><p className="mt-1 text-sm text-paper/75">{user?.department}{user?.level ? ` Â· Level ${user.level}` : ''}</p></div></div><Link to="/profile" className="btn-secondary"><UserRound className="h-4 w-4" />Edit profile</Link></div>{!user?.phoneVerifiedAt && <div className="mt-6 flex flex-col gap-4 rounded-[12px] bg-mango p-4 text-ink sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0" /><div><strong className="block text-sm">Verify your phone</strong><p className="mt-1 text-xs text-ink/65">Verification is required before protected orders and withdrawals.</p></div></div><Link to="/verify-phone" className="inline-flex min-h-11 items-center justify-center rounded-[12px] bg-ink px-4 text-sm font-extrabold text-paper">Verify now</Link></div>}</section><section className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">{shortcuts.map(({ label, to, icon: Icon }) => <Link key={label} to={to} className="notice-slip flex min-h-24 items-center gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-card-hover"><span className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-lime"><Icon className="h-5 w-5" /></span><strong className="text-sm">{label}</strong></Link>)}</section><div className="mt-9 flex flex-wrap items-center justify-between gap-4"><div><h2 className="section-title">Your posts</h2><p className="mt-2 text-sm text-muted">Manage what youâ€™re selling or offering.</p></div><div className="flex gap-2"><Link to="/listings/new" className="btn-primary"><Plus className="h-4 w-4" />Listing</Link><Link to="/services/new" className="btn-secondary"><Plus className="h-4 w-4" />Service</Link></div></div><div className="mt-6 inline-flex rounded-[14px] bg-ink/5 p-1">{['listings', 'services'].map((value) => <button key={value} onClick={() => setTab(value)} className={`min-h-11 rounded-[11px] px-5 text-sm font-extrabold capitalize ${tab === value ? 'bg-paper-bright text-ink shadow-card' : 'text-muted'}`}>{value} ({value === 'listings' ? listings.length : services.length})</button>)}</div>{loading ? <div className="mt-5 space-y-3">{Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-20 animate-pulse rounded-[14px] bg-ink/10" />)}</div> : tab === 'listings' ? <PostList items={listings} type="listing" onRemove={remove} /> : <PostList items={services} type="service" onRemove={remove} />}</div>
   );
+}
+
+function PostList({ items, type, onRemove }) {
+  const Icon = type === 'listing' ? Package : Wrench;
+  if (!items.length) return <div className="notice-slip mt-5 flex min-h-64 flex-col items-center justify-center p-8 text-center"><Icon className="h-9 w-9 text-ink/30" /><h3 className="display-type mt-4 text-3xl">No {type === 'listing' ? 'listings' : 'services'} yet</h3><Link to={type === 'listing' ? '/listings/new' : '/services/new'} className="btn-primary mt-5">Create your first</Link></div>;
+  return <div className="mt-5 space-y-3">{items.map((item) => <div key={item._id} className="notice-slip flex items-center gap-4 p-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[11px] bg-ink/5">{item.images?.[0] ? <img src={item.images[0]} alt="" className="h-full w-full object-cover" /> : <Icon className="h-5 w-5 text-muted" />}</span><div className="min-w-0 flex-1"><strong className="block truncate text-sm">{item.title}</strong><span className="mt-1 block text-xs text-muted">{formatPrice(item.price)} Â· {formatRelativeTime(item.createdAt)}</span></div><div className="flex shrink-0 gap-1"><Link to={`/${type === 'listing' ? 'listings' : 'services'}/${item._id}/edit`} className="btn-ghost text-xs">Edit</Link><button onClick={() => onRemove(type, item._id)} className="btn-ghost text-xs text-coral">Remove</button></div></div>)}</div>;
 }
